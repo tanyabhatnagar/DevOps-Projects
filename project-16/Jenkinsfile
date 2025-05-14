@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'  // This must match the name you gave to your Maven installation
+        maven 'Maven'  // This should match the Maven version you installed in Jenkins
     }
 
     stages {
@@ -11,14 +11,15 @@ pipeline {
                 checkout scm
             }
         }
+
         stage('Build') {
             steps {
                 script {
-                    // Run Maven clean install to build the project
-                    sh 'mvn clean install'
+                    dir('project-16') {  // Make sure we're in the correct directory
+                        sh 'mvn clean install'
+                    }
                 }
             }
         }
     }
 }
-
