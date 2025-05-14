@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "tanyabhatnagar/project-16-app"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'cd project-16 && mvn clean install'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'cd project-16 && mvn test'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'cd project-16 && docker build -t $IMAGE_NAME .'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([string(credentialsId: 'dockerhub-pat', variable: 'DOCKERHUB_TOKEN')]) {
+                    sh '''
+                        echo "$DOCKERHUB_TOKEN" | docker login -u tanyabhatnagar --password-stdin
+                        docker push $IMAGE_NAME
+                    '''
+                }
+            }
+        }
+    }
+}
