@@ -2,17 +2,14 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'
-    }
-
-    environment {
-        DOCKERHUB_CREDENTIALS = credentials('docker-hub')
+        jdk 'jdk17'         // Make sure this matches the name in Global Tool Config
+        maven 'Maven'       // Should also match what you configured
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'project-16', url: 'https://github.com/tanyabhatnagar/DevOps-Projects.git'
+                checkout scm
             }
         }
 
@@ -26,22 +23,24 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                dir('project-16') {
-                    sh 'docker build -t tanyabhatnagar/project-16-app:latest .'
+                script {
+                    dockerImage = docker.build("tanya119/project16-app:latest", 'project-16/')
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withDockerRegistry([credentialsId: 'docker-hub', url: '']) {
-                    dir('project-16') {
-                        sh 'docker push tanyabhatnagar/project-16-app:latest'
+                script {
+                    withDockerRegistry([credentialsId: '51611545-1f09-453a-a2a6-e0120a9347f2', url: '']) {
+                        dockerImage.push()
                     }
                 }
             }
         }
     }
 }
+
+
 
 
