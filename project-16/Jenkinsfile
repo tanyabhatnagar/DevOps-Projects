@@ -5,42 +5,57 @@ pipeline {
             args '-v /var/run/docker.sock:/var/run/docker.sock -v maven-repo:/home/jenkins/.m2 --user 1000'
         }
     }
-    
+
     environment {
         DOCKER_IMAGE = "tanya119/project16-app:latest"
         DOCKER_HUB_CREDENTIALS = credentials('51611545-1f09-453a-a2a6-e0120a9347f2')
     }
-    
+
     stages {
-        stage('Checkout') {
+        stage('Verify Environment') {
             steps {
-                checkout scm
+                sh '''
+                echo "=== ENVIRONMENT ==="
+                pwd
+                ls -la
+                java -version
+                mvn --version
+                docker --version
+                echo "=================="
+                '''
             }
         }
-        
+
         stage('Build JAR') {
             steps {
-                dir('project-16') {
-                    sh 'mvn clean package -DskipTests'
-                    // Verify exact JAR filename
-                    sh 'JAR_FILE=$(ls target/project-16-*.jar) && echo "JAR exists at: ${JAR_FILE}"'
-                }
+                sh 'mvn clean package -DskipTests'
+                sh 'ls -la target/project-16-*.jar'  // Explicit JAR verification
             }
         }
-        
+
+        stage('Prepare Docker Build') {
+            steps {
+                sh '''
+                # Get exact JAR path
+                JAR_PATH=$(ls target/project-16-*.jar)
+                echo "JAR located at: ${JAR_PATH}"
+                
+                # Copy to standardized name
+                cp "${JAR_PATH}" ./application.jar
+                ls -la application.jar  // Verify copy
+                '''
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
-                dir('project-16') {
-                    // Force-copy the JAR to a predictable name first
-                    sh '''
-                    JAR_FILE=$(ls target/project-16-*.jar)
-                    cp ${JAR_FILE} target/application.jar
-                    docker build -t ${DOCKER_IMAGE} .
-                    '''
-                }
+                sh '''
+                docker build --no-cache --progress=plain -t ${DOCKER_IMAGE} .
+                docker inspect ${DOCKER_IMAGE} | grep -i entrypoint  // Verify image
+                '''
             }
         }
-        
+
         stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(
@@ -49,7 +64,7 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
                     docker push ${DOCKER_IMAGE}
                     docker logout
                     '''
@@ -57,9 +72,10 @@ pipeline {
             }
         }
     }
-    
+
     post {
         always {
+            sh 'rm -f ./application.jar'  // Final cleanup
             cleanWs()
         }
     }
