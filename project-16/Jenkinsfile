@@ -26,6 +26,15 @@ pipeline {
             steps {
                 dir('project-16') {
                     sh 'mvn clean package -DskipTests'
+
+                    // No need to copy jar anywhere, keep it inside project-16/target
+                    sh '''
+                    JAR_PATH="$(pwd)/target/project-16-1.0-SNAPSHOT.jar"
+                    if [ ! -f "$JAR_PATH" ]; then
+                        echo "❌ CRITICAL: JAR NOT FOUND AT $JAR_PATH"
+                        exit 1
+                    fi
+                    '''
                 }
             }
         }
@@ -35,8 +44,8 @@ pipeline {
                 dir('project-16') {
                     sh '''
                     docker build --no-cache --progress=plain \
-                        -t "$DOCKER_IMAGE" .
-                    
+                        -t "$DOCKER_IMAGE" \
+                        .
                     docker inspect "$DOCKER_IMAGE" >/dev/null || {
                         echo "❌ IMAGE VERIFICATION FAILED"
                         exit 1
