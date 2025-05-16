@@ -8,20 +8,16 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "tanya119/project16-app:latest"
-        DOCKER_HUB_CREDENTIALS = credentials('51611545-1f09-453a-a2a6-e0120a9347f2')
     }
 
     stages {
-        stage('Verify Environment') {
+        stage('Validate Workspace') {
             steps {
                 sh '''
-                echo "=== ENVIRONMENT ==="
+                echo "=== WORKSPACE CONTENTS ==="
                 pwd
-                ls -la
-                java -version
-                mvn --version
-                docker --version
-                echo "=================="
+                ls -R
+                echo "========================="
                 '''
             }
         }
@@ -29,34 +25,38 @@ pipeline {
         stage('Build JAR') {
             steps {
                 sh 'mvn clean package -DskipTests'
-                sh 'ls -la target/project-16-*.jar'  // Explicit JAR verification
+                sh '''
+                # Absolute path verification
+                JAR_PATH="$(pwd)/target/project-16-1.0-SNAPSHOT.jar"
+                if [ ! -f "$JAR_PATH" ]; then
+                    echo "❌ CRITICAL: JAR NOT FOUND AT $JAR_PATH"
+                    exit 1
+                fi
+                cp "$JAR_PATH" ./application.jar
+                ls -lha application.jar
+                '''
             }
         }
 
-        stage('Prepare Docker Build') {
+        stage('Docker Build') {
             steps {
                 sh '''
-                # Get exact JAR path
-                JAR_PATH=$(ls target/project-16-*.jar)
-                echo "JAR located at: ${JAR_PATH}"
+                # Build with absolute paths
+                docker build --no-cache --progress=plain \
+                    -t "$DOCKER_IMAGE" \
+                    -f Dockerfile \
+                    "$(pwd)"
                 
-                # Copy to standardized name
-                cp "${JAR_PATH}" ./application.jar
-                ls -la application.jar  // Verify copy
+                # Verify image
+                docker inspect "$DOCKER_IMAGE" >/dev/null || {
+                    echo "❌ IMAGE VERIFICATION FAILED"
+                    exit 1
+                }
                 '''
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                sh '''
-                docker build --no-cache --progress=plain -t ${DOCKER_IMAGE} .
-                docker inspect ${DOCKER_IMAGE} | grep -i entrypoint  // Verify image
-                '''
-            }
-        }
-
-        stage('Push Docker Image') {
+        stage('Push Image') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: '51611545-1f09-453a-a2a6-e0120a9347f2',
@@ -64,8 +64,8 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                    docker push ${DOCKER_IMAGE}
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push "$DOCKER_IMAGE"
                     docker logout
                     '''
                 }
@@ -75,7 +75,8 @@ pipeline {
 
     post {
         always {
-            sh 'rm -f ./application.jar'  // Final cleanup
+            sh 'rm -fv application.jar'
+            archiveArtifacts 'target/*.jar'
             cleanWs()
         }
     }
