@@ -1,3 +1,9 @@
-target
-.git
+target/
+*.md
+*.iml
 *.log
+.idea/
+.project
+.classpath
+.settings/
+.DS_Store

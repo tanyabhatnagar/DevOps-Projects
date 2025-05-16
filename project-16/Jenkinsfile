@@ -24,35 +24,34 @@ pipeline {
 
         stage('Build JAR') {
             steps {
-                sh 'mvn clean package -DskipTests'
-                sh '''
-                # Absolute path verification
-                JAR_PATH="$(pwd)/target/project-16-1.0-SNAPSHOT.jar"
-                if [ ! -f "$JAR_PATH" ]; then
-                    echo "❌ CRITICAL: JAR NOT FOUND AT $JAR_PATH"
-                    exit 1
-                fi
-                cp "$JAR_PATH" ./application.jar
-                ls -lha application.jar
-                '''
+                dir('project-16') {
+                    sh 'mvn clean package -DskipTests'
+                    sh '''
+                    JAR_PATH="$(pwd)/target/project-16-1.0-SNAPSHOT.jar"
+                    if [ ! -f "$JAR_PATH" ]; then
+                        echo "❌ CRITICAL: JAR NOT FOUND AT $JAR_PATH"
+                        exit 1
+                    fi
+                    cp "$JAR_PATH" ../application.jar
+                    '''
+                }
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh '''
-                # Build with absolute paths
-                docker build --no-cache --progress=plain \
-                    -t "$DOCKER_IMAGE" \
-                    -f Dockerfile \
-                    "$(pwd)"
-                
-                # Verify image
-                docker inspect "$DOCKER_IMAGE" >/dev/null || {
-                    echo "❌ IMAGE VERIFICATION FAILED"
-                    exit 1
+                dir('project-16') {
+                    sh '''
+                    docker build --no-cache --progress=plain \
+                        -t "$DOCKER_IMAGE" \
+                        -f Dockerfile .
+                    
+                    docker inspect "$DOCKER_IMAGE" >/dev/null || {
+                        echo "❌ IMAGE VERIFICATION FAILED"
+                        exit 1
+                    }
+                    '''
                 }
-                '''
             }
         }
 
@@ -76,7 +75,7 @@ pipeline {
     post {
         always {
             sh 'rm -fv application.jar'
-            archiveArtifacts 'target/*.jar'
+            archiveArtifacts 'project-16/target/*.jar'
             cleanWs()
         }
     }
