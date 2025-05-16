@@ -1,8 +1,8 @@
 pipeline {
     agent {
         docker {
-            image 'tanya119/maven-docker:latest'  // Your verified custom image
-            args '-v /var/run/docker.sock:/var/run/docker.sock -v maven-repo:/home/jenkins/.m2 --user 1000' 
+            image 'tanya119/maven-docker:latest'
+            args '-v /var/run/docker.sock:/var/run/docker.sock -v maven-repo:/home/jenkins/.m2 --user 1000'
         }
     }
     
@@ -14,40 +14,44 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out source code...'
                 checkout scm
             }
         }
         
         stage('Build JAR') {
             steps {
-                echo 'Building project with Maven...'
                 dir('project-16') {
-                    sh 'mvn clean package -DskipTests'  // Changed install->package for Spring Boot
+                    sh 'mvn clean package -DskipTests'
+                    // Verify JAR exists before Docker build
+                    sh 'ls -la target/*.jar' 
                 }
             }
         }
         
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image ${DOCKER_IMAGE}..."
                 dir('project-16') {
-                    sh "docker build -t ${DOCKER_IMAGE} ."  // Build from project dir
+                    // Use exact JAR filename including version
+                    sh '''
+                    JAR_FILE=$(ls target/project-16-*.jar)
+                    docker build --build-arg JAR_FILE=${JAR_FILE} -t ${DOCKER_IMAGE} .
+                    '''
                 }
             }
         }
         
         stage('Push Docker Image') {
             steps {
-                echo "Pushing Docker image to Docker Hub..."
                 withCredentials([usernamePassword(
                     credentialsId: '51611545-1f09-453a-a2a6-e0120a9347f2',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                    sh "docker push ${DOCKER_IMAGE}"
-                    sh 'docker logout'
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push ${DOCKER_IMAGE}
+                    docker logout
+                    '''
                 }
             }
         }
@@ -55,11 +59,9 @@ pipeline {
     
     post {
         failure {
-            echo 'Pipeline failed. Check console output for details.'
             cleanWs()
         }
         success {
-            echo 'Pipeline completed successfully! Artifacts built and pushed.'
             archiveArtifacts 'project-16/target/*.jar'
         }
     }
