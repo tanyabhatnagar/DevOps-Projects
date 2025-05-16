@@ -22,7 +22,8 @@ pipeline {
             steps {
                 dir('project-16') {
                     sh 'mvn clean package -DskipTests'
-                    sh 'ls -la target/'  // Verify JAR exists
+                    // Verify exact JAR filename
+                    sh 'JAR_FILE=$(ls target/project-16-*.jar) && echo "JAR exists at: ${JAR_FILE}"'
                 }
             }
         }
@@ -30,8 +31,12 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 dir('project-16') {
-                    // Use relative path and let Dockerfile handle the pattern
-                    sh 'docker build -t ${DOCKER_IMAGE} .'
+                    // Force-copy the JAR to a predictable name first
+                    sh '''
+                    JAR_FILE=$(ls target/project-16-*.jar)
+                    cp ${JAR_FILE} target/application.jar
+                    docker build -t ${DOCKER_IMAGE} .
+                    '''
                 }
             }
         }
