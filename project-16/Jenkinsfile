@@ -26,14 +26,6 @@ pipeline {
             steps {
                 dir('project-16') {
                     sh 'mvn clean package -DskipTests'
-                    sh '''
-                    JAR_PATH="$(pwd)/target/project-16-1.0-SNAPSHOT.jar"
-                    if [ ! -f "$JAR_PATH" ]; then
-                        echo "❌ CRITICAL: JAR NOT FOUND AT $JAR_PATH"
-                        exit 1
-                    fi
-                    cp "$JAR_PATH" ../application.jar
-                    '''
                 }
             }
         }
@@ -43,8 +35,7 @@ pipeline {
                 dir('project-16') {
                     sh '''
                     docker build --no-cache --progress=plain \
-                        -t "$DOCKER_IMAGE" \
-                        -f Dockerfile .
+                        -t "$DOCKER_IMAGE" .
                     
                     docker inspect "$DOCKER_IMAGE" >/dev/null || {
                         echo "❌ IMAGE VERIFICATION FAILED"
@@ -74,7 +65,6 @@ pipeline {
 
     post {
         always {
-            sh 'rm -fv application.jar'
             archiveArtifacts 'project-16/target/*.jar'
             cleanWs()
         }
