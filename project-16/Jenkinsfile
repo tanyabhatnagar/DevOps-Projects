@@ -1,14 +1,13 @@
 pipeline {
-    agent any
-
-    tools {
-        jdk 'jdk17'           // Ensure this name matches what's in Jenkins > Global Tool Configuration
-        maven 'Maven'         // Should match the configured Maven name in Jenkins
+    agent {
+        docker {
+            image 'maven:3.9.4-eclipse-temurin-17' // Maven + JDK 17 image
+            args '-v /var/run/docker.sock:/var/run/docker.sock' // Mount Docker socket for docker commands
+        }
     }
 
     environment {
-        IMAGE_NAME = 'tanya119/project16-app'
-        IMAGE_TAG = 'latest'
+        DOCKER_IMAGE = "tanya119/project16-app:latest"
     }
 
     stages {
@@ -30,10 +29,8 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image ${IMAGE_NAME}:${IMAGE_TAG}..."
-                script {
-                    dockerImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}", 'project-16/')
-                }
+                echo "Building Docker image ${DOCKER_IMAGE}..."
+                sh "docker build -t ${DOCKER_IMAGE} project-16/"
             }
         }
 
@@ -41,8 +38,8 @@ pipeline {
             steps {
                 echo "Pushing Docker image to Docker Hub..."
                 script {
-                    withDockerRegistry([credentialsId: '51611545-1f09-453a-a2a6-e0120a9347f2', url: '']) {
-                        dockerImage.push()
+                    docker.withRegistry('', '51611545-1f09-453a-a2a6-e0120a9347f2') {
+                        sh "docker push ${DOCKER_IMAGE}"
                     }
                 }
             }
@@ -50,15 +47,13 @@ pipeline {
     }
 
     post {
-        success {
-            echo 'Pipeline completed successfully!'
-        }
         failure {
             echo 'Pipeline failed.'
         }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
     }
 }
-
-
 
 
