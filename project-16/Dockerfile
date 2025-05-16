@@ -1,11 +1,11 @@
-# Use lightweight JDK base image
-FROM openjdk:17-alpine
+# Use a compatible and lightweight JDK base image
+FROM eclipse-temurin:17-jdk-alpine
 
-# Set work directory inside container
+# Set working directory inside the container
 WORKDIR /app
 
-# Copy the final jar file into the image
+# Copy the packaged JAR file from Jenkins workspace to container
 COPY application.jar app.jar
 
-# Run the jar
+# Command to run the Spring Boot application
 ENTRYPOINT ["java", "-jar", "app.jar"]
